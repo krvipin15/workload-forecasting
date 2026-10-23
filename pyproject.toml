@@ -20,6 +20,9 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
+    "orjson>=3.13.0",
+    "pandas>=3.1.0",
+    "pandera[pandas]>=0.34.1",
     "pydantic-settings>=2.16.1",
     "structlog>=26.1.0",
 ]

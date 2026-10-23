@@ -179,11 +179,3 @@ def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
     settings = get_settings()
     logger_name = name or settings.LOGGER_NAME
     return structlog.get_logger(logger_name)
-
-
-if __name__ == "__main__":
-    logger = get_logger(__name__)
-    logger.info("Logger initialized successfully.")
-    logger.debug("This is a debug message.")
-    logger.warning("This is a warning message.")
-    logger.error("This is an error message.")
