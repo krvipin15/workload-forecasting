@@ -19,7 +19,17 @@ classifiers = [
     "Framework :: Pytest",
     "Typing :: Typed",
 ]
-dependencies = []
+dependencies = [
+    "pydantic-settings>=2.16.1",
+    "structlog>=26.1.0",
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.7.0",
+    "ruff>=0.17.2",
+    "ty>=0.0.91",
+]
 
 [project.scripts]
 workload-forecasting = "workload_forecasting:main"
@@ -152,10 +162,3 @@ exclude_lines = [
 fail_under = 85
 show_missing = true
 skip_covered = false
-
-[dependency-groups]
-dev = [
-    "pre-commit>=4.7.0",
-    "ruff>=0.17.2",
-    "ty>=0.0.91",
-]
