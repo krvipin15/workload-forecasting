@@ -28,11 +28,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = [
-    "pre-commit>=4.7.0",
-    "ruff>=0.17.2",
-    "ty>=0.0.91",
-]
+dev = ["pre-commit>=4.7.0", "ruff>=0.17.2", "ty>=0.0.91"]
 
 [project.scripts]
 workload-forecasting = "workload_forecasting:main"
@@ -43,7 +39,6 @@ build-backend = "uv_build"
 
 [project.urls]
 "Source" = "https://github.com/krvipin15/workload-forecasting"
-"Documentation" = "https://krvipin15.github.io/workload-forecasting/"
 "Bug Reports" = "https://github.com/krvipin15/workload-forecasting/issues"
 
 [tool.ty.environment]

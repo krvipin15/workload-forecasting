@@ -20,6 +20,10 @@ cpu_readings_schema = DataFrameSchema(
         ),
         "vm_id": Column(
             pa.String,
+            checks=Check(
+                lambda values: values.astype("string").str.strip().ne("").all(),
+                error="values must not be blank",
+            ),
             nullable=False,
             description="Anonymized VM identifier",
         ),
@@ -42,6 +46,16 @@ cpu_readings_schema = DataFrameSchema(
             description="Average CPU utilization during the five-minute interval",
         ),
     },
+    checks=[
+        Check(lambda df: len(df) > 0, error="dataset must contain at least one row"),
+        Check(
+            lambda df: (
+                (df["min_cpu"] <= df["avg_cpu"] + 1e-6) & (df["avg_cpu"] <= df["max_cpu"] + 1e-6)
+            ),
+            error="expected min_cpu <= avg_cpu <= max_cpu",
+        ),
+    ],
+    unique=["vm_id", "timestamp"],
     strict=True,
     coerce=True,
 )
@@ -51,27 +65,38 @@ vm_metadata_schema = DataFrameSchema(
     {
         "vm_id": Column(
             pa.String,
+            checks=Check(
+                lambda values: values.astype("string").str.strip().ne("").all(),
+                error="values must not be blank",
+            ),
             nullable=False,
-            unique=True,
             description="Anonymized VM identifier (primary key)",
         ),
         "subscription_id": Column(
             pa.String,
+            checks=Check(
+                lambda values: values.astype("string").str.strip().ne("").all(),
+                error="values must not be blank",
+            ),
             nullable=False,
             description="Anonymized subscription identifier",
         ),
         "deployment_id": Column(
             pa.String,
+            checks=Check(
+                lambda values: values.astype("string").str.strip().ne("").all(),
+                error="values must not be blank",
+            ),
             nullable=False,
             description="Anonymized deployment identifier",
         ),
         "timestamp_vm_created": Column(
-            pa.String,
+            pa.Int,
             nullable=True,
             description="VM creation timestamp",
         ),
         "timestamp_vm_deleted": Column(
-            pa.String,
+            pa.Int,
             nullable=True,
             description="VM deletion timestamp",
         ),
@@ -99,16 +124,25 @@ vm_metadata_schema = DataFrameSchema(
             description="Source VM workload category",
         ),
         "virtual_core_bucket": Column(
-            pa.Object,
+            pa.String,
             nullable=True,
             description="Bucketed virtual-core count",
         ),
         "memory_gb_bucket": Column(
-            pa.Object,
+            pa.String,
             nullable=True,
             description="Bucketed VM memory",
         ),
     },
+    checks=Check(
+        lambda df: (
+            df["timestamp_vm_created"].isna()
+            | df["timestamp_vm_deleted"].isna()
+            | (df["timestamp_vm_deleted"] >= df["timestamp_vm_created"])
+        ),
+        error="timestamp_vm_deleted must be >= timestamp_vm_created when both are present",
+    ),
+    unique=["vm_id"],
     strict=False,
     coerce=True,
 )
