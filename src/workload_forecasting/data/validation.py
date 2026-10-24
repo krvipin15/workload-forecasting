@@ -1,12 +1,12 @@
-"""Data Validation Module for Workload Forecasting Project.
+"""Data Validation Module for Forecasting Project.
 
-This module validates raw challenge files (`vm_cpu_readings.csv.gz` and
-`vm_metadata.csv.gz`), performs cross-dataset consistency checks, logs
-execution details with structlog, and exports structured JSON validation
-reports to the configured report directory.
+This module provides functions to validate the VM CPU readings
+and metadata datasets, as well as the final aggregated time-series
+targets. It uses the `pandera` library for schema validation and performs
+cross-dataset consistency checks.
 """
 
-from pathlib import Path
+from dataclasses import dataclass, field
 from typing import Any
 
 import orjson
@@ -15,209 +15,193 @@ import pandera.pandas as pa
 
 from workload_forecasting.config.logger import get_logger
 from workload_forecasting.config.settings import get_settings
-from workload_forecasting.data.schemas import cpu_readings_schema, vm_metadata_schema
+from workload_forecasting.data.schemas import (
+    aggregate_targets_schema,
+    cpu_readings_schema,
+    vm_metadata_schema,
+)
 
-# Constants
-STEP_SECONDS = 300
-MAX_FAILURES_IN_REPORT = 50
+# Initialize the logger
+logger = get_logger(__name__)
 
 
-def _failure_details(exc: pa.errors.SchemaErrors) -> dict[str, Any]:
-    """Extract failure details from a pandera SchemaErrors exception.
+@dataclass
+class ValidationReport:
+    """Container to track validation state across different pipeline stages."""
 
-    Parameters
-    ----------
-    exc : pa.errors.SchemaErrors
-        The SchemaErrors exception raised during schema validation.
+    status: str = "started"
+    cpu_readings_valid: bool = False
+    vm_metadata_valid: bool = False
+    aggregated_targets_valid: bool = False
+    errors: list[dict[str, Any]] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    metrics: dict[str, Any] = field(default_factory=dict)
 
-    Returns
-    -------
-    dict[str, Any]
-        A dictionary containing the number of failures and a list of example
-        failure cases (up to MAX_FAILURES_IN_REPORT).
-    """
-    cases = exc.failure_cases
-    return {
-        "n_failures": len(cases),
-        "examples": cases.head(MAX_FAILURES_IN_REPORT).astype(str).to_dict(orient="records"),
-    }
+    def add_error(self, dataset: str, exc: Exception):
+        """Format and add errors to the report."""
+        error_entry = {"dataset": dataset, "error_type": type(exc).__name__}
+
+        if isinstance(exc, pa.errors.SchemaErrors):
+            cases = exc.failure_cases
+            error_entry.update(
+                {
+                    "n_failures": len(cases),
+                    "examples": cases.head(100).astype(str).to_dict(orient="records"),
+                }
+            )
+        else:
+            error_entry["message"] = str(exc)
+
+        self.errors.append(error_entry)
+
+    def save(self) -> None:
+        """Persist the report to a JSON file in the validation report directory."""
+        settings = get_settings()
+        report_file = settings.VALIDATION_REPORT_DIR / "validation_report.json"
+
+        # Convert dataclass to dict for serialization
+        data = {
+            "status": self.status,
+            "cpu_readings_valid": self.cpu_readings_valid,
+            "vm_metadata_valid": self.vm_metadata_valid,
+            "aggregated_targets_valid": self.aggregated_targets_valid,
+            "errors": self.errors,
+            "warnings": self.warnings,
+            **self.metrics,
+        }
+
+        report_file.write_bytes(orjson.dumps(data, option=orjson.OPT_INDENT_2, default=str))
+        logger.info("Validation report saved successfully", report_path=str(report_file))
 
 
 def _consistency_check(
     cpu_readings_df: pd.DataFrame,
     vm_metadata_df: pd.DataFrame,
-    report: dict[str, Any],
+    report: ValidationReport,
 ) -> None:
-    """Perform cross-dataset consistency checks between CPU readings and VM metadata.
+    """Perform cross-dataset consistency checks.
 
     Parameters
     ----------
     cpu_readings_df : pd.DataFrame
-        DataFrame containing CPU readings with columns `vm_id`, `timestamp`, and `cpu_usage`.
+        DataFrame containing CPU readings with 'vm_id' and 'timestamp'.
     vm_metadata_df : pd.DataFrame
-        DataFrame containing VM metadata with columns `vm_id`, `vm_type`, and `region`.
-    report : dict[str, Any]
-        Dictionary to store validation results and warnings.
+        DataFrame containing VM metadata with 'vm_id'.
+    report : ValidationReport
+        The validation report to update with metrics and warnings.
     """
-    # Identify unique VM IDs in both datasets
+    settings = get_settings()
+    step_seconds = settings.PARAMS.preprocessing.observation_interval_seconds
+
+    # Check for VM IDs present in one dataset but not the other
     cpu_vm_ids = set(cpu_readings_df["vm_id"])
     metadata_vm_ids = set(vm_metadata_df["vm_id"])
-
-    # Determine VMs that are only in CPU readings or only in metadata
     only_cpu = cpu_vm_ids - metadata_vm_ids
     only_meta = metadata_vm_ids - cpu_vm_ids
+    report.metrics["vms_without_metadata"] = len(only_cpu)
+    report.metrics["metadata_without_readings"] = len(only_meta)
 
-    # Add to report and raise an error if there are inconsistencies
-    report["vms_without_metadata"] = len(only_cpu)
-    report["metadata_without_readings"] = len(only_meta)
-
-    # Compute and report the number of observations per VM in CPU readings
+    # Check for empty observations in CPU readings
     counts = cpu_readings_df.groupby("vm_id").size()
     if counts.empty:
         raise ValueError("CPU readings dataset contains no VM observations")
 
-    report["n_vms"] = int(cpu_readings_df["vm_id"].nunique())
-    report["n_cpu_rows"] = len(cpu_readings_df)
-    report["n_timestamps"] = int(cpu_readings_df["timestamp"].nunique())
+    # Compute and store metrics in the report
+    report.metrics["n_vms"] = int(cpu_readings_df["vm_id"].nunique())
+    report.metrics["n_cpu_rows"] = len(cpu_readings_df)
+    report.metrics["n_timestamps"] = int(cpu_readings_df["timestamp"].nunique())
 
-    # Compute and report the number of irregular time steps in CPU readings
+    # Check for irregular time steps in CPU readings
     ordered = cpu_readings_df.sort_values(["vm_id", "timestamp"])
     steps = ordered.groupby("vm_id")["timestamp"].diff().dropna()
-    irregular_count = int((steps != STEP_SECONDS).sum().item())
-    report["irregular_steps"] = irregular_count
+    irregular_count = int((steps != step_seconds).sum().item())
+    report.metrics["irregular_steps"] = irregular_count
 
-    # Add warnings to the report if there are any irregularities
-    warnings = []
     if irregular_count > 0:
-        warnings.append(f"{irregular_count} steps are not {STEP_SECONDS}s")
+        report.warnings.append(f"{irregular_count} steps are not {step_seconds}s")
 
     if only_cpu or only_meta:
-        warnings.append(
+        report.warnings.append(
             f"VM populations differ: {len(only_cpu)} CPU VMs lack metadata, "
             f"{len(only_meta)} metadata VMs lack readings."
         )
 
-    report["warnings"] = warnings
 
-
-def validate_dataset(data_dir: Path | str) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Validate VM CPU readings and metadata datasets from the dataset folder.
-
-    Note: This function assumes that the input CSV files are compressed with
-    gzip and have the `.csv.gz` extension.
+def validate_datasets(
+    cpu_readings_df: pd.DataFrame,
+    vm_metadata_df: pd.DataFrame,
+    report: ValidationReport,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Validate the CPU readings and VM metadata datasets.
 
     Parameters
     ----------
-    data_dir : Path or str
-        Directory path containing `vm_cpu_readings.csv.gz` and `vm_metadata.csv.gz`.
+    cpu_readings_df : pd.DataFrame
+        DataFrame containing CPU readings with 'vm_id' and 'timestamp'.
+    vm_metadata_df : pd.DataFrame
+        DataFrame containing VM metadata with 'vm_id'.
+    report : ValidationReport
+        The validation report to update with metrics and warnings.
 
     Returns
     -------
     tuple[pd.DataFrame, pd.DataFrame]
-        A tuple containing the validated CPU readings DataFrame and VM metadata DataFrame.
+        Validated CPU readings and VM metadata DataFrames.
 
     Raises
     ------
-    FileNotFoundError
-        If required input CSV files are missing in `data_dir`.
-    pandera.errors.SchemaErrors
-        If the data fails schema validation checks.
     Exception
-        For any unexpected failures during loading, validation, or reporting.
+        If validation fails for either dataset, the exception is logged and re-raised.
     """
-    logger = get_logger(__name__)
-
-    # Define the dir and file paths
-    cpu_readings_file = Path(data_dir) / "vm_cpu_readings.csv.gz"
-    metadata_file = Path(data_dir) / "vm_metadata.csv.gz"
-
-    report_data: dict[str, Any] = {
-        "status": "failed",
-        "cpu_readings_valid": False,
-        "vm_metadata_valid": False,
-        "errors": [],
-        "warnings": [],
-    }
-
     try:
-        # Check if the required files exist
-        for required_file in (cpu_readings_file, metadata_file):
-            if not required_file.is_file():
-                raise FileNotFoundError(f"Missing file or not a file: {required_file}")
-
-        # Load the datasets
-        logger.debug("Loading CPU readings dataset", file_path=str(cpu_readings_file))
-        cpu_readings_df = pd.read_csv(cpu_readings_file, compression="gzip")
-        logger.info("CPU readings dataset loaded", shape=cpu_readings_df.shape)
-        logger.debug("Loading VM metadata dataset", file_path=str(metadata_file))
-        vm_metadata_df = pd.read_csv(metadata_file, compression="gzip")
-        logger.info("VM metadata dataset loaded", shape=vm_metadata_df.shape)
-
-        report_data["input_files"] = {
-            "cpu_readings": str(cpu_readings_file),
-            "vm_metadata": str(metadata_file),
-        }
-
-        # Validate the datasets against their respective schemas
         logger.info("Executing schema validation on CPU readings")
-        try:
-            validated_cpu = cpu_readings_schema.validate(cpu_readings_df, lazy=True)
-            report_data["cpu_readings_valid"] = True
-            logger.info("CPU readings schema validation passed", total_rows=len(validated_cpu))
-        except pa.errors.SchemaErrors as exc:
-            report_data["errors"].append(
-                {
-                    "dataset": "vm_cpu_readings",
-                    "error_type": type(exc).__name__,
-                    **_failure_details(exc),
-                }
-            )
-            raise
+        validated_cpu = cpu_readings_schema.validate(cpu_readings_df, lazy=True)
+        report.cpu_readings_valid = True
 
         logger.info("Executing schema validation on VM metadata")
-        try:
-            validated_metadata = vm_metadata_schema.validate(vm_metadata_df, lazy=True)
-            report_data["vm_metadata_valid"] = True
-            logger.info("VM metadata schema validation passed", total_rows=len(validated_metadata))
-        except pa.errors.SchemaErrors as exc:
-            report_data["errors"].append(
-                {
-                    "dataset": "vm_metadata",
-                    "error_type": type(exc).__name__,
-                    **_failure_details(exc),
-                }
-            )
-            raise
+        validated_metadata = vm_metadata_schema.validate(vm_metadata_df, lazy=True)
+        report.vm_metadata_valid = True
 
         logger.info("Checking cross-dataset entity consistency")
-        _consistency_check(
-            validated_cpu,
-            validated_metadata,
-            report_data,
-        )
-
-        report_data["status"] = "success"
-        logger.info(
-            "Dataset validation completed successfully",
-            n_vms=report_data["n_vms"],
-            n_timestamps=report_data["n_timestamps"],
-        )
+        _consistency_check(validated_cpu, validated_metadata, report)
 
         return validated_cpu, validated_metadata
 
-    except FileNotFoundError as exc:
-        report_data["errors"].append({"error_type": type(exc).__name__, "message": str(exc)})
-        logger.exception("Required input file missing", error=str(exc))
-        raise
     except Exception as exc:
-        if not any(
-            error.get("error_type") == type(exc).__name__ for error in report_data["errors"]
-        ):
-            report_data["errors"].append({"error_type": type(exc).__name__, "message": str(exc)})
+        report.status = "failed"
+        if isinstance(exc, pa.errors.SchemaErrors):
+            # Determine which dataset failed by looking at the error context if possible
+            dataset = "vm_cpu_readings" if "cpu_readings" in str(exc).lower() else "vm_metadata"
+            report.add_error(dataset, exc)
+        else:
+            report.add_error("general_dataset_validation", exc)
+
         logger.exception("Dataset validation failed", error=str(exc))
         raise
 
-    finally:
-        report_file = get_settings().VALIDATION_REPORT_DIR / "validation_report.json"
-        report_file.write_bytes(orjson.dumps(report_data, option=orjson.OPT_INDENT_2, default=str))
-        logger.info("Validation report saved successfully", report_path=str(report_file))
+
+def validate_aggregated_targets(targets_df: pd.DataFrame, report: ValidationReport) -> pd.DataFrame:
+    """Validate the aggregated time-series targets.
+
+    Parameters
+    ----------
+    targets_df : pd.DataFrame
+        DataFrame containing the aggregated time-series targets.
+    report : ValidationReport
+        The validation report to update with metrics and warnings.
+
+    Returns
+    -------
+    pd.DataFrame
+        Validated aggregated targets DataFrame.
+    """
+    logger.info("Executing schema validation on aggregated targets")
+    try:
+        validated_df = aggregate_targets_schema.validate(targets_df, lazy=True)
+        report.aggregated_targets_valid = True
+        return validated_df
+    except Exception as exc:
+        report.status = "failed"
+        report.add_error("aggregated_targets", exc)
+        logger.exception("Aggregated targets validation failed", error=str(exc))
+        raise

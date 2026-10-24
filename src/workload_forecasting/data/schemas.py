@@ -1,4 +1,4 @@
-"""Data Validation Schemas for Workload Forecasting Project.
+"""Data Validation Schemas for Forecasting Project.
 
 This module defines the data validation schemas for the workload
 forecasting project using the Pandera library. The schemas are used
@@ -144,5 +144,36 @@ vm_metadata_schema = DataFrameSchema(
     ),
     unique=["vm_id"],
     strict=False,
+    coerce=True,
+)
+
+# Define the schema for aggregate targets data
+aggregate_targets_schema = DataFrameSchema(
+    {
+        "timestamp": Column(
+            pa.Int,
+            Check.ge(0),
+            nullable=False,
+            description="Observation timestamp in seconds",
+        ),
+        "active_vm_count": Column(
+            pa.Int,
+            Check.ge(0),
+            nullable=False,
+            description="Number of active VMs",
+        ),
+        "aggregate_cpu_utilization": Column(
+            pa.Float,
+            Check.between(0.0, 100.0),
+            nullable=False,
+            description="Mean CPU utilization percentage",
+        ),
+    },
+    checks=Check(
+        lambda df: df["timestamp"].is_monotonic_increasing,
+        error="Timestamps must be strictly chronological",
+    ),
+    unique=["timestamp"],
+    strict=True,
     coerce=True,
 )
