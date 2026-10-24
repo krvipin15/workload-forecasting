@@ -1,0 +1,5 @@
+preprocessing:
+  # The time distance between each observation (e.g., 300s = 5 mins)
+  observation_interval_seconds: 300
+  # The number of observations to consider for the holdout set (e.g., 24 = 2 hours)
+  holdout_window_size: 24

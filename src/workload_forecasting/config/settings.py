@@ -8,8 +8,10 @@ overrides, runtime directories, and hyperparameter configuration (`params.yaml`)
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
-from pydantic import Field
+import yaml
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -42,6 +44,7 @@ def _find_project_root(current_path: Path) -> Path:
 
 # Get the base directory for the project
 BASE_DIR = _find_project_root(Path(__file__).resolve())
+DEFAULT_PARAMS_FILE = BASE_DIR / "params.yaml"
 
 
 class Environment(StrEnum):
@@ -63,6 +66,77 @@ class LogLevel(StrEnum):
     CRITICAL = "CRITICAL"
 
 
+class ImmutableBaseModel(BaseModel):
+    """Base Pydantic model enforcing immutable and strict configuration.
+
+    Subclasses inherit validation behavior intended to prevent accidental
+    mutation of application configuration after initialization.
+    """
+
+    model_config = ConfigDict(
+        frozen=True,
+        extra="forbid",
+        populate_by_name=True,
+    )
+
+
+class PreprocessingParams(ImmutableBaseModel):
+    """Define the preprocessing parameters.
+
+    This model defines the parameters used for data preprocessing.
+    The parameters are validated to ensure they meet the required constraints.
+    """
+
+    observation_interval_seconds: int = Field(default=300, ge=1)
+    holdout_window_size: int = Field(default=24, ge=1)
+
+
+class PipelineParams(ImmutableBaseModel):
+    """Define the complete validated pipeline configuration.
+
+    Aggregates dataset schema, preprocessing, training, evaluation, and
+    metadata configuration into a single type-safe parameter object.
+    """
+
+    preprocessing: PreprocessingParams = Field(default_factory=PreprocessingParams)
+
+    @classmethod
+    def load_from_yaml(cls, path: Path = DEFAULT_PARAMS_FILE) -> "PipelineParams":
+        """Load and validate pipeline parameters from a YAML configuration file.
+
+        The YAML contents are parsed into the validated parameter model. If the
+        configuration file does not exist, the model's default configuration is
+        returned instead.
+
+        Parameters
+        ----------
+        path : pathlib.Path, default=DEFAULT_PARAMS_FILE
+            Path to the YAML parameter configuration file.
+
+        Returns
+        -------
+        PipelineParams
+            Validated pipeline parameter configuration.
+
+        Raises
+        ------
+        ValueError
+            If the YAML file exists but contains invalid parameter values or
+            cannot be parsed into the expected configuration schema.
+        """
+        if not path.is_file():
+            return cls()
+
+        try:
+            with path.open(encoding="utf-8") as f:
+                raw_data: dict[str, Any] = yaml.safe_load(f) or {}
+            return cls.model_validate(raw_data)
+        except yaml.YAMLError as exc:
+            raise RuntimeError(f"Malformed YAML configuration in '{path}': {exc}") from exc
+        except ValidationError as exc:
+            raise RuntimeError(f"Invalid pipeline parameter schema in '{path}': {exc}") from exc
+
+
 class Settings(BaseSettings):
     """Define validated application-wide runtime configuration.
 
@@ -81,18 +155,33 @@ class Settings(BaseSettings):
     # Runtime configuration
     ENVIRONMENT: Environment = Field(default=Environment.DEVELOPMENT)
     LOG_LEVEL: LogLevel = Field(default=LogLevel.DEBUG)
-    LOG_BACKUP_COUNT: int = Field(default=14, ge=1)
-    LOG_ROTATION_WHEN: str = Field(default="midnight", pattern=r"^(midnight|[Hh]|[Dd]|[Ww])$")
     LOGGER_NAME: str = Field(default="workload_forecast", min_length=1)
 
     # Workspace Paths
     LOGS_DIR: Path = Field(default_factory=lambda: BASE_DIR / "logs")
-    RAW_DATA_DIR: Path = Field(default_factory=lambda: BASE_DIR / "data" / "raw")
-    PROCESSED_DATA_DIR: Path = Field(default_factory=lambda: BASE_DIR / "data" / "processed")
-    PREDICTION_DATA_DIR: Path = Field(default_factory=lambda: BASE_DIR / "data" / "predictions")
+    PREDICTION_DATA_DIR: Path = Field(default_factory=lambda: BASE_DIR / "predictions")
     MODEL_DIR: Path = Field(default_factory=lambda: BASE_DIR / "models")
     TRAINING_REPORT_DIR: Path = Field(default_factory=lambda: BASE_DIR / "reports" / "training")
     VALIDATION_REPORT_DIR: Path = Field(default_factory=lambda: BASE_DIR / "reports" / "validation")
+
+    # Pipeline Parameters
+    _params_cache: PipelineParams | None = None
+
+    @property
+    def PARAMS(self) -> PipelineParams:
+        """Return the lazily loaded pipeline configuration.
+
+        Loads and validates ``params.yaml`` on first access and caches the
+        resulting configuration for subsequent accesses.
+
+        Returns
+        -------
+        PipelineParams
+            Validated pipeline hyperparameters and processing configuration.
+        """
+        if self._params_cache is None:
+            self._params_cache = PipelineParams.load_from_yaml(DEFAULT_PARAMS_FILE)
+        return self._params_cache
 
     def ensure_directories(self) -> None:
         """Create required application workspace directories.
@@ -103,8 +192,6 @@ class Settings(BaseSettings):
         """
         directories = [
             self.LOGS_DIR,
-            self.RAW_DATA_DIR,
-            self.PROCESSED_DATA_DIR,
             self.PREDICTION_DATA_DIR,
             self.MODEL_DIR,
             self.VALIDATION_REPORT_DIR,
