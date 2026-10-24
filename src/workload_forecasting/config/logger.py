@@ -10,9 +10,7 @@ import logging
 import logging.handlers
 import sys
 import threading
-from datetime import UTC, datetime
 from typing import Any
-from uuid import uuid4
 
 import structlog
 
@@ -137,13 +135,8 @@ def configure_logging(*, force: bool = False) -> None:
         )
 
         file_handler = logging.handlers.TimedRotatingFileHandler(
-            filename=str(
-                settings.LOGS_DIR
-                / (f"{datetime.now(UTC):%Y%m%dT%H%M%S}_{uuid4().hex[:4]}" + ".log")
-            ),
-            when=settings.LOG_ROTATION_WHEN,
+            filename=str(settings.LOGS_DIR / "pipeline.log"),
             interval=1,
-            backupCount=settings.LOG_BACKUP_COUNT,
             encoding="utf-8",
         )
         file_handler.setFormatter(

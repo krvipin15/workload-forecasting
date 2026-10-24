@@ -11,5 +11,5 @@ settings
     Defines environment-aware configuration, .env file integration,
     and project directory management.
 logger
-    Configures structured logging, rotating log files, and error reporting.
+    Configures structured logging, persistent log files, and error reporting.
 """
