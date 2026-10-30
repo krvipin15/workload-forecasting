@@ -37,16 +37,6 @@ hooks-run:
 test:
     uv run pytest tests/ -v
 
-## --- Documentation ---
-
-# Serve the documentation site locally with live reload
-docs-serve mkdocs_port="5050":
-    uv run mkdocs serve -a 127.0.0.1:{{mkdocs_port}} --strict
-
-# Publish the documentation to GitHub Pages
-docs-deploy:
-    uv run mkdocs gh-deploy -csm "Deploy the latest documentation" -b gh-pages --shell --force
-
 ## --- Cleanup ---
 
 # Clean everything; cache, generated files and logs
@@ -62,13 +52,11 @@ clean-cache:
 
 # Clean the generated log files
 clean-logs:
-    sudo rm -f logs/*.log
+    rm -f logs/*.log
     @echo "success: Cleaned log files in the logs directory."
 
 # Clean the generated files such as models, data, and reports
 clean-generated:
-    sudo rm -f models/*.{joblib,ubj,json}
-    sudo rm -f data/raw/*.{parquet,csv} data/processed/*.parquet data/predictions/*.csv
-    sudo rm -f reports/{validation,training}/*.json
-    sudo rm -f challenge_data/*.{parquet,csv}
+    rm -f predictions/*.csv
+    rm -f reports/{validation,training}/*.json
     @echo "success: Cleaned generated files in models, data, and reports directories."

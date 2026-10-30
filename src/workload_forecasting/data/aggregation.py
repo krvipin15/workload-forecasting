@@ -10,32 +10,33 @@ from typing import cast
 import pandas as pd
 
 from workload_forecasting.config.logger import get_logger
-from workload_forecasting.config.settings import get_settings
 
 # Initialize the logger
 logger = get_logger(__name__)
 
 
-def aggregate_cpu_data(cpu_readings_df: pd.DataFrame) -> pd.DataFrame:
+def aggregate_cpu_data(cpu_readings_df: pd.DataFrame, step_seconds: int) -> pd.DataFrame:
     """Aggregate raw VM CPU readings into global time-series targets.
 
     This function calculates two primary metrics per timestamp:
     1. active_vm_count: The number of distinct VMs with observations.
     2. aggregate_cpu_utilization: The mean average CPU utilization across all VMs.
 
-    The resulting series is reindexed to a strict 5-minute grid to detect
-    missing observations or gaps in the data.
+    The resulting series is reindexed to a strict timestamp grid to detect missing
+    observations or gaps in the data.
 
     Parameters
     ----------
     cpu_readings_df : pd.DataFrame
         The raw CPU readings dataframe containing at least 'timestamp',
         'vm_id', and 'avg_cpu' columns.
+    step_seconds : int
+        The time gap between each data point in seconds e.g., 300 (5 mins)
 
     Returns
     -------
     pd.DataFrame
-        A dataframe indexed by timestamp containing the aggregate targets
+        A dataframe containing the aggregate targets `timestamps`,
         'active_vm_count' and 'aggregate_cpu_utilization'.
 
     Raises
@@ -47,15 +48,15 @@ def aggregate_cpu_data(cpu_readings_df: pd.DataFrame) -> pd.DataFrame:
         If required columns ('timestamp', 'vm_id', 'avg_cpu') are missing
         from the input dataframe.
     """
-    settings = get_settings()
-
     logger.info(
         "Starting aggregation of CPU data to derive targets", total_rows=len(cpu_readings_df)
     )
 
     try:
-        # Drop rows with NaN values in the "avg_cpu" column to ensure clean means
+        # Drop duplicated rows and rows with NaN values
         valid = cpu_readings_df.dropna(subset=["avg_cpu"])
+        valid = valid.drop_duplicates(["timestamp", "vm_id"])
+
         n_dropped = len(cpu_readings_df) - len(valid)
         if n_dropped > 0:
             logger.info("Dropped rows with NaN avg_cpu", n=n_dropped)
@@ -70,12 +71,16 @@ def aggregate_cpu_data(cpu_readings_df: pd.DataFrame) -> pd.DataFrame:
         )
         logger.info("Aggregation complete", aggregate_rows=len(y))
 
-        # Create a complete timestamp grid with a step of 5 minutes (300s)
+        # Create a complete timestamp grid with a provided step seconds
         start = cast(int, y.index.min())
         stop = cast(int, y.index.max()) + 1
-        step_seconds = settings.PARAMS.preprocessing.observation_interval_seconds
 
-        logger.debug("Reindexing to 5-minute grid", start=start, stop=stop)
+        logger.debug(
+            "Reindexing the timestamp grid",
+            start=start,
+            stop=stop,
+            step_seconds=step_seconds,
+        )
         grid = pd.RangeIndex(start, stop, step_seconds, name="timestamp")
         y = y.reindex(grid)
 
@@ -97,9 +102,6 @@ def aggregate_cpu_data(cpu_readings_df: pd.DataFrame) -> pd.DataFrame:
 
         return result
 
-    except KeyError as e:
-        logger.exception("Required column missing from input dataframe", missing_col=str(e))
-        raise
     except Exception as e:
         logger.exception("An unexpected error occurred during target building", error=str(e))
         raise

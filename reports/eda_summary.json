@@ -1,0 +1,285 @@
+{
+  "data_quality": {
+    "readings": 1340000.0,
+    "VMs": 10000.0,
+    "metadata rows": 10000.0,
+    "VMs without metadata": 0.0,
+    "distinct timestamps": 134.0,
+    "span (hours)": 11.17,
+    "readings per VM (min)": 134.0,
+    "readings per VM (max)": 134.0,
+    "VMs per timestamp (min)": 10000.0,
+    "VMs per timestamp (max)": 10000.0,
+    "duplicate (vm_id, timestamp)": 0.0,
+    "null cells": 0.0,
+    "gaps != 300 s": 0.0,
+    "avg_cpu outside [min, max]": 0.0,
+    "readings outside [0, 100]": 0.0
+  },
+  "lifetime_status": {
+    "existing before window, survives": 10000
+  },
+  "median_lifetime_h": 719.8333333333334,
+  "cpu_stats": {
+    "mean avg_cpu (all readings)": 9.388100729421827,
+    "median VM mean": 5.480792662056373,
+    "VMs with mean < 5 %": 0.4643,
+    "VMs with mean > 50 %": 0.0221,
+    "readings with max_cpu >= 90 %": 0.021086567164179105,
+    "share of total CPU from top 1% VMs": 0.09610003651207256,
+    "share of total CPU from top 5% VMs": 0.3003219839176357,
+    "share of total CPU from top 10% VMs": 0.43560888721185853,
+    "share of total CPU from top 20% VMs": 0.5877046826713616
+  },
+  "adf_p": {
+    "level": 0.41326568870344266,
+    "first_difference": 0.07742044012297598
+  },
+  "train_range_pct": [
+    9.111633601754887,
+    9.912175173984915
+  ],
+  "peak_threshold_pct": 9.668361517488389,
+  "persistence_vs_mean": [
+    {
+      "horizon_steps": 1,
+      "horizon_min": 5,
+      "persistence_MAE": 0.1211170756358897,
+      "train_mean_MAE": 0.14958475373723482,
+      "persistence_better": true
+    },
+    {
+      "horizon_steps": 3,
+      "horizon_min": 15,
+      "persistence_MAE": 0.11947540911935309,
+      "train_mean_MAE": 0.14958475373723482,
+      "persistence_better": true
+    },
+    {
+      "horizon_steps": 6,
+      "horizon_min": 30,
+      "persistence_MAE": 0.1532278814049053,
+      "train_mean_MAE": 0.14958475373723482,
+      "persistence_better": false
+    },
+    {
+      "horizon_steps": 12,
+      "horizon_min": 60,
+      "persistence_MAE": 0.15889973436280602,
+      "train_mean_MAE": 0.14958475373723482,
+      "persistence_better": false
+    },
+    {
+      "horizon_steps": 18,
+      "horizon_min": 90,
+      "persistence_MAE": 0.23438461422456622,
+      "train_mean_MAE": 0.14958475373723482,
+      "persistence_better": false
+    },
+    {
+      "horizon_steps": 24,
+      "horizon_min": 120,
+      "persistence_MAE": 0.22781227363627243,
+      "train_mean_MAE": 0.14958475373723482,
+      "persistence_better": false
+    }
+  ],
+  "implied_pairwise_corr": 0.0010098359917478307,
+  "aggregate_name_1h": 0.016878928384149387,
+  "segments": {
+    "vm_category": [
+      {
+        "vm_category": "Delay-insensitive",
+        "VMs": 6180,
+        "mean_avg_cpu": 8.2358,
+        "p95_of_vm_means": 25.7474,
+        "mean_max_cpu": 18.0978,
+        "vm_share": 0.618,
+        "cpu_share": 0.5421
+      },
+      {
+        "vm_category": "Interactive",
+        "VMs": 3091,
+        "mean_avg_cpu": 11.4926,
+        "p95_of_vm_means": 46.0253,
+        "mean_max_cpu": 19.2154,
+        "vm_share": 0.3091,
+        "cpu_share": 0.3784
+      },
+      {
+        "vm_category": "Unknown",
+        "VMs": 729,
+        "mean_avg_cpu": 10.2332,
+        "p95_of_vm_means": 48.3933,
+        "mean_max_cpu": 16.795,
+        "vm_share": 0.0729,
+        "cpu_share": 0.0795
+      }
+    ],
+    "virtual_core_bucket": [
+      {
+        "virtual_core_bucket": "2",
+        "VMs": 7534,
+        "mean_avg_cpu": 9.7249,
+        "p95_of_vm_means": 34.1452,
+        "mean_max_cpu": 18.6562,
+        "vm_share": 0.7534,
+        "cpu_share": 0.7804
+      },
+      {
+        "virtual_core_bucket": "4",
+        "VMs": 1908,
+        "mean_avg_cpu": 7.928,
+        "p95_of_vm_means": 31.3432,
+        "mean_max_cpu": 16.4933,
+        "vm_share": 0.1908,
+        "cpu_share": 0.1611
+      },
+      {
+        "virtual_core_bucket": "8",
+        "VMs": 486,
+        "mean_avg_cpu": 9.7004,
+        "p95_of_vm_means": 35.6573,
+        "mean_max_cpu": 19.7373,
+        "vm_share": 0.0486,
+        "cpu_share": 0.0502
+      },
+      {
+        "virtual_core_bucket": "24",
+        "VMs": 62,
+        "mean_avg_cpu": 11.3975,
+        "p95_of_vm_means": 50.5903,
+        "mean_max_cpu": 24.9714,
+        "vm_share": 0.0062,
+        "cpu_share": 0.0075
+      },
+      {
+        "virtual_core_bucket": ">24",
+        "VMs": 10,
+        "mean_avg_cpu": 6.6176,
+        "p95_of_vm_means": 19.0652,
+        "mean_max_cpu": 31.7133,
+        "vm_share": 0.001,
+        "cpu_share": 0.0007
+      }
+    ],
+    "memory_gb_bucket": [
+      {
+        "memory_gb_bucket": "2",
+        "VMs": 3904,
+        "mean_avg_cpu": 8.7753,
+        "p95_of_vm_means": 15.8846,
+        "mean_max_cpu": 19.7137,
+        "vm_share": 0.3904,
+        "cpu_share": 0.3649
+      },
+      {
+        "memory_gb_bucket": "4",
+        "VMs": 2475,
+        "mean_avg_cpu": 11.3443,
+        "p95_of_vm_means": 48.4855,
+        "mean_max_cpu": 18.301,
+        "vm_share": 0.2475,
+        "cpu_share": 0.2991
+      },
+      {
+        "memory_gb_bucket": "8",
+        "VMs": 2146,
+        "mean_avg_cpu": 9.1828,
+        "p95_of_vm_means": 46.4441,
+        "mean_max_cpu": 17.5275,
+        "vm_share": 0.2146,
+        "cpu_share": 0.2099
+      },
+      {
+        "memory_gb_bucket": "32",
+        "VMs": 1383,
+        "mean_avg_cpu": 7.8441,
+        "p95_of_vm_means": 28.2042,
+        "mean_max_cpu": 15.3819,
+        "vm_share": 0.1383,
+        "cpu_share": 0.1156
+      },
+      {
+        "memory_gb_bucket": "64",
+        "VMs": 82,
+        "mean_avg_cpu": 11.2713,
+        "p95_of_vm_means": 47.0132,
+        "mean_max_cpu": 24.6538,
+        "vm_share": 0.0082,
+        "cpu_share": 0.0098
+      },
+      {
+        "memory_gb_bucket": ">64",
+        "VMs": 10,
+        "mean_avg_cpu": 6.6176,
+        "p95_of_vm_means": 19.0652,
+        "mean_max_cpu": 31.7133,
+        "vm_share": 0.001,
+        "cpu_share": 0.0007
+      }
+    ]
+  },
+  "peak_contrib": [
+    {
+      "segment": "virtual_core_bucket=2",
+      "vm_share": 0.7534,
+      "peak_minus_rest_%pts": 0.6127,
+      "weighted_contribution": 0.4616
+    },
+    {
+      "segment": "vm_category=Delay-insensitive",
+      "vm_share": 0.618,
+      "peak_minus_rest_%pts": 0.5639,
+      "weighted_contribution": 0.3485
+    },
+    {
+      "segment": "memory_gb_bucket=2",
+      "vm_share": 0.3904,
+      "peak_minus_rest_%pts": 0.5681,
+      "weighted_contribution": 0.2218
+    },
+    {
+      "segment": "memory_gb_bucket=4",
+      "vm_share": 0.2475,
+      "peak_minus_rest_%pts": 0.7598,
+      "weighted_contribution": 0.1881
+    },
+    {
+      "segment": "vm_category=Interactive",
+      "vm_share": 0.3091,
+      "peak_minus_rest_%pts": 0.3648,
+      "weighted_contribution": 0.1128
+    },
+    {
+      "segment": "memory_gb_bucket=8",
+      "vm_share": 0.2146,
+      "peak_minus_rest_%pts": 0.2745,
+      "weighted_contribution": 0.0589
+    },
+    {
+      "segment": "virtual_core_bucket=4",
+      "vm_share": 0.1908,
+      "peak_minus_rest_%pts": 0.0069,
+      "weighted_contribution": 0.0013
+    },
+    {
+      "segment": "vm_category=Unknown",
+      "vm_share": 0.0729,
+      "peak_minus_rest_%pts": -0.029,
+      "weighted_contribution": -0.0021
+    },
+    {
+      "segment": "virtual_core_bucket=8",
+      "vm_share": 0.0486,
+      "peak_minus_rest_%pts": -0.0444,
+      "weighted_contribution": -0.0022
+    },
+    {
+      "segment": "memory_gb_bucket=32",
+      "vm_share": 0.1383,
+      "peak_minus_rest_%pts": -0.0309,
+      "weighted_contribution": -0.0043
+    }
+  ]
+}

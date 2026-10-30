@@ -177,3 +177,17 @@ aggregate_targets_schema = DataFrameSchema(
     strict=True,
     coerce=True,
 )
+
+# Submission contract: exactly these columns, finite, non-negative count, CPU in [0, 100].
+predictions_schema = DataFrameSchema(
+    {
+        "timestamp": Column(pa.Int, nullable=False),
+        "active_vm_count": Column(pa.Float, Check.in_range(0, 1e12), nullable=False),
+        "aggregate_cpu_utilization": Column(pa.Float, Check.in_range(0, 100), nullable=False),
+    },
+    unique=["timestamp"],
+    strict=True,
+    coerce=True,
+    ordered=True,
+    name="predictions",
+)

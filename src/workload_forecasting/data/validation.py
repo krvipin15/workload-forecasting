@@ -46,7 +46,7 @@ class ValidationReport:
             error_entry.update(
                 {
                     "n_failures": len(cases),
-                    "examples": cases.head(100).astype(str).to_dict(orient="records"),
+                    "examples": cases.head(300).astype(str).to_dict(orient="records"),
                 }
             )
         else:
@@ -77,6 +77,7 @@ class ValidationReport:
 def _consistency_check(
     cpu_readings_df: pd.DataFrame,
     vm_metadata_df: pd.DataFrame,
+    step_seconds: int,
     report: ValidationReport,
 ) -> None:
     """Perform cross-dataset consistency checks.
@@ -87,12 +88,11 @@ def _consistency_check(
         DataFrame containing CPU readings with 'vm_id' and 'timestamp'.
     vm_metadata_df : pd.DataFrame
         DataFrame containing VM metadata with 'vm_id'.
+    step_seconds : int
+        Expected time step in seconds for CPU readings.
     report : ValidationReport
         The validation report to update with metrics and warnings.
     """
-    settings = get_settings()
-    step_seconds = settings.PARAMS.preprocessing.observation_interval_seconds
-
     # Check for VM IDs present in one dataset but not the other
     cpu_vm_ids = set(cpu_readings_df["vm_id"])
     metadata_vm_ids = set(vm_metadata_df["vm_id"])
@@ -130,8 +130,9 @@ def _consistency_check(
 def validate_datasets(
     cpu_readings_df: pd.DataFrame,
     vm_metadata_df: pd.DataFrame,
+    step_seconds: int,
     report: ValidationReport,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+) -> None:
     """Validate the CPU readings and VM metadata datasets.
 
     Parameters
@@ -140,13 +141,10 @@ def validate_datasets(
         DataFrame containing CPU readings with 'vm_id' and 'timestamp'.
     vm_metadata_df : pd.DataFrame
         DataFrame containing VM metadata with 'vm_id'.
+    step_seconds : int
+        Expected time step in seconds for CPU readings.
     report : ValidationReport
         The validation report to update with metrics and warnings.
-
-    Returns
-    -------
-    tuple[pd.DataFrame, pd.DataFrame]
-        Validated CPU readings and VM metadata DataFrames.
 
     Raises
     ------
@@ -163,9 +161,9 @@ def validate_datasets(
         report.vm_metadata_valid = True
 
         logger.info("Checking cross-dataset entity consistency")
-        _consistency_check(validated_cpu, validated_metadata, report)
+        _consistency_check(validated_cpu, validated_metadata, step_seconds, report)
 
-        return validated_cpu, validated_metadata
+        return
 
     except Exception as exc:
         report.status = "failed"
@@ -180,7 +178,7 @@ def validate_datasets(
         raise
 
 
-def validate_aggregated_targets(targets_df: pd.DataFrame, report: ValidationReport) -> pd.DataFrame:
+def validate_targets(targets_df: pd.DataFrame, report: ValidationReport) -> None:
     """Validate the aggregated time-series targets.
 
     Parameters
@@ -189,17 +187,12 @@ def validate_aggregated_targets(targets_df: pd.DataFrame, report: ValidationRepo
         DataFrame containing the aggregated time-series targets.
     report : ValidationReport
         The validation report to update with metrics and warnings.
-
-    Returns
-    -------
-    pd.DataFrame
-        Validated aggregated targets DataFrame.
     """
     logger.info("Executing schema validation on aggregated targets")
     try:
-        validated_df = aggregate_targets_schema.validate(targets_df, lazy=True)
+        aggregate_targets_schema.validate(targets_df, lazy=True)
         report.aggregated_targets_valid = True
-        return validated_df
+        return
     except Exception as exc:
         report.status = "failed"
         report.add_error("aggregated_targets", exc)

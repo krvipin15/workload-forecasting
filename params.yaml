@@ -1,5 +1,28 @@
 preprocessing:
-  # The time distance between each observation (e.g., 300s = 5 mins)
-  observation_interval_seconds: 300
-  # The number of observations to consider for the holdout set (e.g., 24 = 2 hours)
-  holdout_window_size: 24
+  # The time gap between each data point in seconds (300s = 5 minutes)
+  step_seconds: 300
+
+  # Number of steps to reserve for the final evaluation (24 steps * 5m = 2 hours)
+  holdout: 24
+
+forecasting:
+  # The number of cross-validation folds to use for model evaluation
+  cv_windows: 4
+
+  # The number of steps between the start of each cross-validation fold (12 steps * 5m = 1 hour)
+  cv_step: 12
+
+  # The minimum number of training steps to use for the first fold (24 steps * 5m = 2 hours)
+  min_train: 24
+
+  # The number of steps to use for the training window (48 steps * 5m = 4 hours)
+  window_sizes: [6, 12]
+
+  # The lengths of the seasonal periods to consider (in steps)
+  season_lengths: [12]
+
+  # The confidence level for the empirical CV-error band (e.g., 90% confidence interval)
+  interval_level: 90
+
+  # The quantile to use for identifying "peak" values in the training window
+  peak_quantile: 0.9

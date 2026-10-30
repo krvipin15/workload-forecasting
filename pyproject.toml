@@ -29,6 +29,14 @@ dependencies = [
 
 [dependency-groups]
 dev = ["pre-commit>=4.7.0", "ruff>=0.17.2", "ty>=0.0.91"]
+eda = [
+    "ipykernel>=7.4.0",
+    "matplotlib>=3.11.2",
+    "seaborn>=0.13.2",
+    "statsforecast>=2.0.1",
+    "utilsforecast>=0.2.17",
+]
+test = ["pytest>=9.2.0", "pytest-cov>=7.1.0"]
 
 [project.scripts]
 workload-forecasting = "workload_forecasting.cli:main"
@@ -95,6 +103,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "src/workload_forecasting/config/settings.py" = ["N802", "S104"]
 "src/workload_forecasting/config/logger.py" = ["FBT003"]
+"notebooks/01_eda.ipynb" = ["T201"]
 "tests/**/*.py" = ["ARG001", "PLR2004", "S101"]
 
 [tool.ruff.format]
@@ -147,6 +156,7 @@ omit = [
     "src/workload_forecasting/config/logger.py",
     "src/workload_forecasting/config/settings.py",
     "src/workload_forecasting/data/schemas.py",
+    "src/workload_forecasting/__main__.py ",
 ]
 
 [tool.coverage.report]

@@ -134,9 +134,9 @@ def configure_logging(*, force: bool = False) -> None:
             )
         )
 
-        file_handler = logging.handlers.TimedRotatingFileHandler(
+        file_handler = logging.FileHandler(
             filename=str(settings.LOGS_DIR / "pipeline.log"),
-            interval=1,
+            mode="w",
             encoding="utf-8",
         )
         file_handler.setFormatter(

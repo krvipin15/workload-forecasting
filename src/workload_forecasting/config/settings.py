@@ -87,8 +87,20 @@ class PreprocessingParams(ImmutableBaseModel):
     The parameters are validated to ensure they meet the required constraints.
     """
 
-    observation_interval_seconds: int = Field(default=300, ge=1)
-    holdout_window_size: int = Field(default=24, ge=1)
+    step_seconds: int = Field(default=300, ge=1)
+    holdout: int = Field(default=24, ge=1)
+
+
+class ForecastingParams(ImmutableBaseModel):
+    """Define rolling-origin CV and candidate-model parameters."""
+
+    cv_windows: int = Field(default=4, ge=1)
+    cv_step: int = Field(default=12, ge=1)
+    min_train: int = Field(default=24, ge=2)
+    window_sizes: list[int] = Field(default_factory=lambda: [6, 12])
+    season_lengths: list[int] = Field(default_factory=lambda: [12])
+    interval_level: int = Field(default=90, ge=1, le=99)
+    peak_quantile: float = Field(default=0.9, gt=0, lt=1)
 
 
 class PipelineParams(ImmutableBaseModel):
@@ -99,6 +111,7 @@ class PipelineParams(ImmutableBaseModel):
     """
 
     preprocessing: PreprocessingParams = Field(default_factory=PreprocessingParams)
+    forecasting: ForecastingParams = Field(default_factory=ForecastingParams)
 
     @classmethod
     def load_from_yaml(cls, path: Path = DEFAULT_PARAMS_FILE) -> "PipelineParams":
@@ -154,15 +167,15 @@ class Settings(BaseSettings):
 
     # Runtime configuration
     ENVIRONMENT: Environment = Field(default=Environment.DEVELOPMENT)
-    LOG_LEVEL: LogLevel = Field(default=LogLevel.DEBUG)
+    LOG_LEVEL: LogLevel = Field(default=LogLevel.INFO)
     LOGGER_NAME: str = Field(default="workload_forecast", min_length=1)
 
     # Workspace Paths
     LOGS_DIR: Path = Field(default_factory=lambda: BASE_DIR / "logs")
     PREDICTION_DATA_DIR: Path = Field(default_factory=lambda: BASE_DIR / "predictions")
-    MODEL_DIR: Path = Field(default_factory=lambda: BASE_DIR / "models")
     TRAINING_REPORT_DIR: Path = Field(default_factory=lambda: BASE_DIR / "reports" / "training")
     VALIDATION_REPORT_DIR: Path = Field(default_factory=lambda: BASE_DIR / "reports" / "validation")
+    FIGURE_DIR: Path = Field(default_factory=lambda: BASE_DIR / "reports" / "figures")
 
     # Pipeline Parameters
     _params_cache: PipelineParams | None = None
@@ -193,9 +206,9 @@ class Settings(BaseSettings):
         directories = [
             self.LOGS_DIR,
             self.PREDICTION_DATA_DIR,
-            self.MODEL_DIR,
             self.VALIDATION_REPORT_DIR,
             self.TRAINING_REPORT_DIR,
+            self.FIGURE_DIR,
         ]
         for directory in directories:
             directory.mkdir(parents=True, exist_ok=True)
